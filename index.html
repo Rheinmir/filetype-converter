@@ -3,159 +3,307 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chuyên gia Resize Ảnh Hàng Loạt</title>
+    <title>Image Resizer - macOS Style</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Giữ FFmpeg như một tùy chọn cho GIF, nhưng BMP sẽ dùng Encoder thuần cho ổn định -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd/ffmpeg.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
     <style>
-        .drop-zone { border: 2px dashed #cbd5e1; transition: all 0.3s ease; }
-        .drop-zone.active { border-color: #3b82f6; background-color: #eff6ff; }
-        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #F5F5F7;
+        }
+
+        .mac-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mac-sidebar {
+            background: rgba(246, 246, 246, 0.7);
+            border-right: 1px solid #D1D1D1;
+            transition: all 0.3s ease;
+            width: 280px;
+            overflow: hidden;
+        }
+
+        .mac-sidebar.collapsed {
+            width: 0;
+            padding: 0;
+            border-right: none;
+            opacity: 0;
+        }
+
+        .drop-zone {
+            border: 2px dashed #D1D1D6;
+            transition: all 0.2s ease;
+            background: #FFFFFF;
+        }
+        .drop-zone.active {
+            border-color: #007AFF;
+            background-color: #F2F8FF;
+        }
+
+        input[type="number"], input[type="text"], select {
+            background: #FFFFFF;
+            border: 1px solid #D1D1D6;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+        }
+
+        .mac-button-primary {
+            background: linear-gradient(180deg, #007AFF 0%, #0063CC 100%);
+            border: 1px solid #005BB3;
+            color: white;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* Traffic Lights - macOS Style */
+        .traffic-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        /* Chỉ hiển thị icon khi hover vào vùng chứa các nút */
+        .traffic-lights-container:hover .traffic-light::after {
+            opacity: 1;
+        }
+        
+        .traffic-light::after {
+            opacity: 0;
+            font-size: 9px;
+            font-weight: 700;
+            color: rgba(0,0,0,0.5);
+            transition: opacity 0.1s ease;
+            line-height: 1;
+        }
+        
+        #btn-close::after { content: '×'; }
+        #btn-min::after { content: '−'; margin-top: -1px; }
+        #btn-max::after { content: '⤢'; font-size: 7px; }
+
+        .loading-spinner {
+            border: 2px solid #E5E5E7;
+            border-top: 2px solid #007AFF;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 0.8s linear infinite;
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #C1C1C1; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 font-sans pb-20">
+<body class="min-h-screen flex items-center justify-center p-4 md:p-8">
 
-<div class="max-w-5xl mx-auto py-10 px-4">
-    <header class="text-center mb-10">
-        <h1 class="text-4xl font-bold text-slate-900 mb-2">Image Resizer Pro <span class="text-blue-600">Batch</span></h1>
-        <p class="text-slate-500 italic">Phiên bản ổn định - Hỗ trợ Preview BMP 24-bit</p>
-    </header>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Cấu hình -->
-        <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit sticky top-6">
-            <h2 class="text-lg font-semibold mb-4 border-b pb-2">Cấu hình</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Phương thức</label>
-                    <select id="resizeMethod" class="w-full p-2 border rounded-lg outline-none">
-                        <option value="pixels">Pixels (Điểm ảnh)</option>
-                        <option value="percentage">Percentage (%)</option>
-                    </select>
-                </div>
-
-                <div id="pixelControls" class="space-y-4">
-                    <select id="dimensionType" class="w-full p-2 border rounded-lg outline-none">
-                        <option value="width">Chiều rộng (Width)</option>
-                        <option value="height">Chiều cao (Height)</option>
-                        <option value="both">Cả hai (Tùy chỉnh)</option>
-                    </select>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div id="widthContainer">
-                            <label class="block text-[10px] uppercase font-bold text-slate-400">Rộng (px)</label>
-                            <input type="number" id="widthInput" value="800" class="w-full p-2 border rounded-lg outline-none">
-                        </div>
-                        <div id="heightContainer" class="opacity-50">
-                            <label class="block text-[10px] uppercase font-bold text-slate-400">Cao (px)</label>
-                            <input type="number" id="heightInput" value="600" disabled class="w-full p-2 border rounded-lg outline-none">
-                        </div>
-                    </div>
-                    <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" id="maintainAspectRatio" checked class="w-4 h-4"> Giữ tỷ lệ ảnh
-                    </label>
-                </div>
-
-                <div id="percentageControls" class="hidden space-y-2">
-                    <input type="range" id="percentageSlider" min="1" max="1000" value="50" class="w-full">
-                    <input type="number" id="percentageInput" value="50" class="w-full p-2 border rounded-lg text-center">
-                </div>
-
-                <hr>
-                <div>
-                    <label class="block text-sm font-medium mb-1 text-blue-600">Đổi tên file</label>
-                    <input type="text" id="fileNameInput" placeholder="Tên file mới..." class="w-full p-2 border-2 border-blue-50 rounded-lg outline-none focus:border-blue-400">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium mb-1">Định dạng đầu ra</label>
-                    <select id="outputFormat" class="w-full p-2 border rounded-lg outline-none">
-                        <option value="original">Gốc (Giữ nguyên)</option>
-                        <option value="bmp">BMP Tiêu chuẩn (24-bit)</option>
-                    </select>
-                </div>
-
-                <button id="processBtn" disabled class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl transition-all shadow-lg mt-4">
-                    <span id="btnText">Chưa có ảnh</span>
-                </button>
+<div id="app-container" class="w-full max-w-6xl h-[85vh] flex overflow-hidden mac-card rounded-2xl shadow-2xl">
+    
+    <!-- Sidebar -->
+    <aside id="sidebar" class="mac-sidebar flex flex-shrink-0 flex-col p-6 overflow-y-auto custom-scrollbar">
+        <div class="flex items-center gap-2 mb-8 flex-shrink-0">
+            <!-- Nút điều khiển kiểu macOS -->
+            <div class="traffic-lights-container flex gap-1.5">
+                <div id="btn-close" class="traffic-light bg-[#FF5F57] border border-[#E0443E]" title="Reset ứng dụng"></div>
+                <div id="btn-min" class="traffic-light bg-[#FFBD2E] border border-[#DEA123]" title="Ẩn sidebar"></div>
+                <div id="btn-max" class="traffic-light bg-[#28C840] border border-[#1AAB29]" title="Toàn màn hình"></div>
             </div>
+            <h1 class="ml-2 font-bold text-slate-800 text-sm tracking-tight uppercase select-none">Resizer Pro</h1>
         </div>
 
-        <!-- Upload & List -->
-        <div class="lg:col-span-2 space-y-6">
-            <div id="dropZone" class="drop-zone bg-white h-40 rounded-2xl flex flex-col items-center justify-center cursor-pointer relative overflow-hidden">
+        <div class="space-y-6">
+            <section>
+                <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-3 tracking-wider">Cấu hình kích thước</label>
+                <div class="space-y-4">
+                    <div>
+                        <span class="block text-xs font-medium text-slate-600 mb-1.5">Phương thức</span>
+                        <select id="resizeMethod" class="w-full">
+                            <option value="pixels">Pixels (Điểm ảnh)</option>
+                            <option value="percentage">Phần trăm (%)</option>
+                        </select>
+                    </div>
+
+                    <div id="pixelControls" class="space-y-4">
+                        <div>
+                            <span class="block text-xs font-medium text-slate-600 mb-1.5">Kích thước theo</span>
+                            <select id="dimensionType" class="w-full">
+                                <option value="width">Chiều rộng (Width)</option>
+                                <option value="height">Chiều cao (Height)</option>
+                                <option value="both" selected>Cả hai (Tùy chỉnh)</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div id="widthContainer">
+                                <span class="block text-[10px] font-medium text-slate-400 mb-1">Rộng (px)</span>
+                                <input type="number" id="widthInput" value="1280" class="w-full">
+                            </div>
+                            <div id="heightContainer">
+                                <span class="block text-[10px] font-medium text-slate-400 mb-1">Cao (px)</span>
+                                <input type="number" id="heightInput" value="800" class="w-full">
+                            </div>
+                        </div>
+                        <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                            <input type="checkbox" id="maintainAspectRatio" checked class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-0"> 
+                            Giữ tỷ lệ ảnh
+                        </label>
+                    </div>
+
+                    <div id="percentageControls" class="hidden space-y-3">
+                        <input type="range" id="percentageSlider" min="1" max="1000" value="50" class="w-full accent-blue-500">
+                        <input type="number" id="percentageInput" value="50" class="w-full text-center">
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-3 tracking-wider">Định dạng & Tên</label>
+                <div class="space-y-4">
+                    <div>
+                        <span class="block text-xs font-medium text-slate-600 mb-1.5">Đổi tên file</span>
+                        <input type="text" id="fileNameInput" value="background" placeholder="Tên file mới..." class="w-full font-medium">
+                    </div>
+                    <div>
+                        <span class="block text-xs font-medium text-slate-600 mb-1.5">Định dạng đầu ra</span>
+                        <select id="outputFormat" class="w-full">
+                            <option value="original">Gốc (Giữ nguyên)</option>
+                            <option value="bmp" selected>BMP (Chuẩn 24-bit)</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <button id="processBtn" disabled class="w-full mac-button-primary py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98] disabled:opacity-40 disabled:scale-100 mt-4">
+                <span id="btnText">Chưa có ảnh</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col bg-white overflow-hidden relative">
+        <button id="sidebar-toggle" class="hidden absolute left-4 top-4 z-10 p-2 bg-white border border-slate-200 rounded-full shadow-md text-slate-400 hover:text-blue-600 transition-all">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        </button>
+
+        <header class="h-14 border-b border-slate-100 flex items-center justify-between px-6 flex-shrink-0">
+            <h2 class="text-[13px] font-semibold text-slate-700">Trình quản lý tệp tin</h2>
+            <div id="fileCountHeader" class="text-[11px] text-slate-400 font-medium">0 tệp đã chọn</div>
+        </header>
+
+        <div class="flex-1 p-6 overflow-y-auto custom-scrollbar flex flex-col gap-6">
+            <div id="dropZone" class="drop-zone rounded-xl flex flex-col items-center justify-center p-8 cursor-pointer relative flex-shrink-0 min-h-[160px]">
                 <input type="file" id="fileInput" class="hidden" multiple accept="image/*">
-                <div id="uploadPrompt" class="text-center">
-                    <p class="font-medium">Kéo thả hoặc click để chọn ảnh</p>
-                    <p class="text-xs text-slate-400 mt-1">Hỗ trợ JPG, PNG, GIF, SVG</p>
+                <div id="uploadPrompt" class="text-center group">
+                    <div class="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <p class="text-[13px] font-medium text-slate-600">Kéo thả ảnh vào đây để bắt đầu</p>
+                    <p class="text-[11px] text-slate-400 mt-1">Hỗ trợ JPG, PNG, GIF, SVG</p>
                 </div>
 
-                <!-- Progress Overlay -->
-                <div id="loadingOverlay" class="hidden absolute inset-0 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center z-20 p-6">
-                    <div class="loading-spinner mb-4 w-10 h-10 border-4"></div>
-                    <p id="statusText" class="text-blue-600 font-bold text-sm text-center">Đang xử lý...</p>
-                    <div class="w-full max-w-xs bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+                <div id="loadingOverlay" class="hidden absolute inset-0 bg-white/95 backdrop-blur-md flex flex-col items-center justify-center z-20 p-8 rounded-xl">
+                    <div class="loading-spinner mb-4"></div>
+                    <p id="statusText" class="text-[13px] text-blue-600 font-semibold text-center max-w-xs">Đang chuẩn bị...</p>
+                    <div class="w-full max-w-sm bg-slate-100 h-1 rounded-full mt-6 overflow-hidden">
                         <div id="progressBar" class="bg-blue-600 h-full w-0 transition-all duration-300"></div>
                     </div>
                 </div>
             </div>
 
-            <div id="fileListCard" class="hidden bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="font-bold text-sm">Danh sách (<span id="fileCount">0</span>)</h3>
-                    <button id="clearBtn" class="text-[10px] text-red-500 uppercase font-bold tracking-wider">Xóa hết</button>
+            <div id="fileListCard" class="hidden animate-in fade-in slide-in-from-bottom-2">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hàng chờ</h3>
+                    <button id="clearBtn" class="text-[10px] text-red-500 font-bold uppercase hover:opacity-70">Xóa hết</button>
                 </div>
-                <div id="fileListItems" class="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-xs"></div>
+                <div id="fileListItems" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-[12px]"></div>
             </div>
 
-            <div id="resultCard" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold text-emerald-700 uppercase">Hoàn tất</h2>
-                    <button id="downloadAllBtn" class="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm">Tải về tất cả</button>
+            <div id="resultCard" class="hidden animate-in fade-in slide-in-from-bottom-4">
+                <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-50">
+                    <h2 class="text-sm font-bold text-slate-800 uppercase">Kết quả</h2>
+                    <button id="downloadAllBtn" class="mac-button-primary text-[11px] font-bold px-4 py-1.5 rounded-md active:scale-95 shadow-sm uppercase">Tải về tất cả</button>
                 </div>
-                <div id="resultsTable" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                <div id="resultsTable" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
             </div>
         </div>
-    </div>
+    </main>
 </div>
 
 <script>
-    // --- BMP Encoder (Pure JS) ---
-    // Đảm bảo file BMP 24-bit chuẩn để có preview trên mọi OS
+    // --- Traffic Light Functionality ---
+    const btnClose = document.getElementById('btn-close');
+    const btnMin = document.getElementById('btn-min');
+    const btnMax = document.getElementById('btn-max');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const appContainer = document.getElementById('app-container');
+
+    btnClose.onclick = () => {
+        if (confirm("Bạn có muốn reset toàn bộ ứng dụng và xóa danh sách ảnh không?")) {
+            location.reload();
+        }
+    };
+
+    const toggleSidebar = () => {
+        sidebar.classList.toggle('collapsed');
+        sidebarToggle.classList.toggle('hidden');
+    };
+    btnMin.onclick = toggleSidebar;
+    sidebarToggle.onclick = toggleSidebar;
+
+    btnMax.onclick = () => {
+        if (!document.fullscreenElement) {
+            appContainer.requestFullscreen().catch(err => {
+                alert(`Lỗi khi mở toàn màn hình: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
+    // --- BMP Encoder ---
     function encodeBMP(canvas) {
         const ctx = canvas.getContext('2d');
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const { width, height, data } = imgData;
-        
         const padding = (4 - (width * 3) % 4) % 4;
         const fileSize = 54 + (width * 3 + padding) * height;
         const buffer = new ArrayBuffer(fileSize);
         const view = new DataView(buffer);
-
-        // File Header
-        view.setUint16(0, 0x4D42, true); // BM
+        view.setUint16(0, 0x4D42, true); 
         view.setUint32(2, fileSize, true);
-        view.setUint32(10, 54, true); // Offset
-
-        // Info Header
+        view.setUint32(10, 54, true); 
         view.setUint32(14, 40, true);
         view.setInt32(18, width, true);
         view.setInt32(22, height, true);
         view.setUint16(26, 1, true);
-        view.setUint16(28, 24, true); // 24-bit
+        view.setUint16(28, 24, true); 
         view.setUint32(34, (width * 3 + padding) * height, true);
-
-        // Pixel Data (Bottom-up)
         let pos = 54;
         for (let y = height - 1; y >= 0; y--) {
             for (let x = 0; x < width; x++) {
                 const i = (y * width + x) * 4;
-                view.setUint8(pos++, data[i + 2]); // B
-                view.setUint8(pos++, data[i + 1]); // G
-                view.setUint8(pos++, data[i]);     // R
+                view.setUint8(pos++, data[i + 2]); 
+                view.setUint8(pos++, data[i + 1]); 
+                view.setUint8(pos++, data[i]);     
             }
             pos += padding;
         }
@@ -172,7 +320,7 @@
     const fileInput = document.getElementById('fileInput');
     const fileListCard = document.getElementById('fileListCard');
     const fileListItems = document.getElementById('fileListItems');
-    const fileCount = document.getElementById('fileCount');
+    const fileCountHeader = document.getElementById('fileCountHeader');
     const clearBtn = document.getElementById('clearBtn');
     const processBtn = document.getElementById('processBtn');
     const btnText = document.getElementById('btnText');
@@ -192,10 +340,7 @@
 
     async function initFFmpeg() {
         if (ffmpeg) return true;
-        if (!window.SharedArrayBuffer) {
-            console.warn("Môi trường không hỗ trợ FFmpeg WASM (thiếu SharedArrayBuffer). Sẽ dùng chế độ Canvas thuần.");
-            return false;
-        }
+        if (!window.SharedArrayBuffer) return false;
         try {
             ffmpeg = new FFmpeg();
             const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
@@ -204,29 +349,34 @@
                 wasmURL: await FFmpegUtil.toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
             });
             return true;
-        } catch (e) {
-            console.error("FFmpeg load error:", e);
-            return false;
-        }
+        } catch (e) { return false; }
     }
 
-    // Logic UI
-    dimensionType.addEventListener('change', (e) => {
+    dimensionType.onchange = (e) => {
         const val = e.target.value;
         widthInput.disabled = (val === 'height');
         heightInput.disabled = (val === 'width');
-        document.getElementById('widthContainer').style.opacity = (val === 'height') ? '0.5' : '1';
-        document.getElementById('heightContainer').style.opacity = (val === 'width') ? '0.5' : '1';
-    });
+        document.getElementById('widthContainer').style.opacity = (val === 'height') ? '0.4' : '1';
+        document.getElementById('heightContainer').style.opacity = (val === 'width') ? '0.4' : '1';
+    };
 
-    resizeMethod.addEventListener('change', (e) => {
+    resizeMethod.onchange = (e) => {
         const isPixels = e.target.value === 'pixels';
         document.getElementById('pixelControls').classList.toggle('hidden', !isPixels);
         document.getElementById('percentageControls').classList.toggle('hidden', isPixels);
-    });
+    };
 
     dropZone.onclick = () => fileInput.click();
     fileInput.onchange = (e) => handleFiles(e.target.files);
+    
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('active'); };
+    dropZone.ondragleave = () => dropZone.classList.remove('active');
+    dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('active');
+        if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+    };
+
     clearBtn.onclick = () => { selectedFiles = []; updateUI(); };
 
     function handleFiles(files) {
@@ -245,18 +395,21 @@
     }
 
     function updateUI() {
-        fileCount.innerText = selectedFiles.length;
-        btnText.innerText = selectedFiles.length > 0 ? `Bắt đầu (${selectedFiles.length} ảnh)` : "Chưa có ảnh";
-        processBtn.disabled = selectedFiles.length === 0;
-        fileListCard.classList.toggle('hidden', selectedFiles.length === 0);
-        fileListItems.innerHTML = selectedFiles.map(f => `
-            <div class="flex justify-between p-1 border-b italic">
-                <span class="truncate max-w-[150px]">${f.file.name}</span>
-                <span>${f.w}x${f.h}px</span>
+        const len = selectedFiles.length;
+        fileCountHeader.innerText = `${len} tệp đã chọn`;
+        btnText.innerText = len > 0 ? `Bắt đầu xử lý (${len})` : "Chưa có ảnh";
+        processBtn.disabled = len === 0;
+        fileListCard.classList.toggle('hidden', len === 0);
+        fileListItems.innerHTML = selectedFiles.map((f) => `
+            <div class="flex flex-col p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                <span class="truncate font-semibold text-slate-700 mb-1">${f.file.name}</span>
+                <span class="text-[10px] text-slate-400 font-mono">${f.w}x${f.h}px</span>
             </div>
         `).join('');
-        if (selectedFiles.length > 0 && !fileNameInput.value) {
-            fileNameInput.value = selectedFiles[0].file.name.split('.')[0];
+        // Không ghi đè tên mặc định nếu người dùng đã nhập
+        if (len > 0 && (!fileNameInput.value || fileNameInput.value === 'background')) {
+            // Có thể giữ 'background' làm mặc định hoặc lấy tên file đầu tiên
+            // Ở đây giữ 'background' theo yêu cầu
         }
     }
 
@@ -272,13 +425,11 @@
         for (let i = 0; i < selectedFiles.length; i++) {
             const item = selectedFiles[i];
             progressBar.style.width = ((i / selectedFiles.length) * 100) + '%';
-            statusText.innerText = `Xử lý: ${item.file.name}`;
-
+            statusText.innerText = `Đang xử lý: ${item.file.name}`;
             const dims = calculateTargetDims(item);
             const ext = isBmpMode ? 'bmp' : item.file.name.split('.').pop().toLowerCase();
-            const baseName = fileNameInput.value.trim() || "image";
+            const baseName = fileNameInput.value.trim() || "background";
             const finalName = i === 0 ? `${baseName}.${ext}` : `${baseName}_${i}.${ext}`;
-
             try {
                 let blob;
                 if (item.file.type === 'image/gif' && useFFmpeg) {
@@ -290,9 +441,9 @@
                 addResult(blob, finalName);
             } catch (err) { console.error(err); }
         }
-
         loadingOverlay.classList.add('hidden');
         resultCard.classList.remove('hidden');
+        resultCard.scrollIntoView({ behavior: 'smooth' });
     };
 
     function calculateTargetDims(item) {
@@ -316,15 +467,11 @@
                 canvas.width = w; canvas.height = h;
                 const ctx = canvas.getContext('2d');
                 ctx.imageSmoothingQuality = 'high';
-                ctx.fillStyle = "#FFFFFF"; // Nền trắng cho BMP/JPG
+                ctx.fillStyle = "#FFFFFF"; 
                 ctx.fillRect(0, 0, w, h);
                 ctx.drawImage(img, 0, 0, w, h);
-                
-                if (toBmp) {
-                    resolve(encodeBMP(canvas)); // Dùng encoder thuần
-                } else {
-                    canvas.toBlob(b => resolve(b), item.file.type);
-                }
+                if (toBmp) resolve(encodeBMP(canvas));
+                else canvas.toBlob(b => resolve(b), item.file.type);
             };
             img.src = URL.createObjectURL(item.file);
         });
@@ -341,14 +488,18 @@
     function addResult(blob, name) {
         const url = URL.createObjectURL(blob);
         const div = document.createElement('div');
-        div.className = "flex items-center gap-3 bg-slate-50 p-2 rounded-lg border";
+        div.className = "flex flex-col p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition-shadow";
         div.innerHTML = `
-            <img src="${url}" class="w-10 h-10 object-cover rounded">
-            <div class="flex-1 min-w-0">
-                <p class="text-[10px] font-bold truncate">${name}</p>
-                <p class="text-[8px] text-slate-400 uppercase">${(blob.size/1024).toFixed(1)} KB</p>
+            <div class="h-32 mb-3 bg-slate-50 rounded-lg flex items-center justify-center overflow-hidden">
+                <img src="${url}" class="max-w-full max-h-full object-contain">
             </div>
-            <a href="${url}" download="${name}" class="text-blue-600 font-bold text-xs">Tải</a>
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex-1 min-w-0">
+                    <p class="text-[11px] font-bold text-slate-800 truncate">${name}</p>
+                    <p class="text-[9px] text-slate-400 font-medium">${(blob.size/1024).toFixed(1)} KB</p>
+                </div>
+                <a href="${url}" download="${name}" class="text-blue-600 font-bold text-[11px] hover:underline flex-shrink-0">Tải về</a>
+            </div>
         `;
         resultsTable.appendChild(div);
     }
@@ -356,10 +507,11 @@
     downloadAllBtn.onclick = () => {
         processedResults.forEach((r, i) => setTimeout(() => {
             const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; a.click();
-        }, i * 300));
+        }, i * 350));
     };
 
     document.getElementById('percentageSlider').oninput = (e) => document.getElementById('percentageInput').value = e.target.value;
+    document.getElementById('percentageInput').oninput = (e) => document.getElementById('percentageSlider').value = e.target.value;
 </script>
 </body>
 </html>
