@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chuyên gia Resize Ảnh Hàng Loạt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Giữ FFmpeg như một tùy chọn cho GIF, nhưng BMP sẽ dùng Encoder thuần cho ổn định -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <style>
+        .drop-zone { border: 2px dashed #cbd5e1; transition: all 0.3s ease; }
+        .drop-zone.active { border-color: #3b82f6; background-color: #eff6ff; }
+        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 font-sans pb-20">
+
+<div class="max-w-5xl mx-auto py-10 px-4">
+    <header class="text-center mb-10">
+        <h1 class="text-4xl font-bold text-slate-900 mb-2">Image Resizer Pro <span class="text-blue-600">Batch</span></h1>
+        <p class="text-slate-500 italic">Phiên bản ổn định - Hỗ trợ Preview BMP 24-bit</p>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Cấu hình -->
+        <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit sticky top-6">
+            <h2 class="text-lg font-semibold mb-4 border-b pb-2">Cấu hình</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Phương thức</label>
+                    <select id="resizeMethod" class="w-full p-2 border rounded-lg outline-none">
+                        <option value="pixels">Pixels (Điểm ảnh)</option>
+                        <option value="percentage">Percentage (%)</option>
+                    </select>
+                </div>
+
+                <div id="pixelControls" class="space-y-4">
+                    <select id="dimensionType" class="w-full p-2 border rounded-lg outline-none">
+                        <option value="width">Chiều rộng (Width)</option>
+                        <option value="height">Chiều cao (Height)</option>
+                        <option value="both">Cả hai (Tùy chỉnh)</option>
+                    </select>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div id="widthContainer">
+                            <label class="block text-[10px] uppercase font-bold text-slate-400">Rộng (px)</label>
+                            <input type="number" id="widthInput" value="800" class="w-full p-2 border rounded-lg outline-none">
+                        </div>
+                        <div id="heightContainer" class="opacity-50">
+                            <label class="block text-[10px] uppercase font-bold text-slate-400">Cao (px)</label>
+                            <input type="number" id="heightInput" value="600" disabled class="w-full p-2 border rounded-lg outline-none">
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" id="maintainAspectRatio" checked class="w-4 h-4"> Giữ tỷ lệ ảnh
+                    </label>
+                </div>
+
+                <div id="percentageControls" class="hidden space-y-2">
+                    <input type="range" id="percentageSlider" min="1" max="1000" value="50" class="w-full">
+                    <input type="number" id="percentageInput" value="50" class="w-full p-2 border rounded-lg text-center">
+                </div>
+
+                <hr>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-blue-600">Đổi tên file</label>
+                    <input type="text" id="fileNameInput" placeholder="Tên file mới..." class="w-full p-2 border-2 border-blue-50 rounded-lg outline-none focus:border-blue-400">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Định dạng đầu ra</label>
+                    <select id="outputFormat" class="w-full p-2 border rounded-lg outline-none">
+                        <option value="original">Gốc (Giữ nguyên)</option>
+                        <option value="bmp">BMP Tiêu chuẩn (24-bit)</option>
+                    </select>
+                </div>
+
+                <button id="processBtn" disabled class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl transition-all shadow-lg mt-4">
+                    <span id="btnText">Chưa có ảnh</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Upload & List -->
+        <div class="lg:col-span-2 space-y-6">
+            <div id="dropZone" class="drop-zone bg-white h-40 rounded-2xl flex flex-col items-center justify-center cursor-pointer relative overflow-hidden">
+                <input type="file" id="fileInput" class="hidden" multiple accept="image/*">
+                <div id="uploadPrompt" class="text-center">
+                    <p class="font-medium">Kéo thả hoặc click để chọn ảnh</p>
+                    <p class="text-xs text-slate-400 mt-1">Hỗ trợ JPG, PNG, GIF, SVG</p>
+                </div>
+
+                <!-- Progress Overlay -->
+                <div id="loadingOverlay" class="hidden absolute inset-0 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center z-20 p-6">
+                    <div class="loading-spinner mb-4 w-10 h-10 border-4"></div>
+                    <p id="statusText" class="text-blue-600 font-bold text-sm text-center">Đang xử lý...</p>
+                    <div class="w-full max-w-xs bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+                        <div id="progressBar" class="bg-blue-600 h-full w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="fileListCard" class="hidden bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-sm">Danh sách (<span id="fileCount">0</span>)</h3>
+                    <button id="clearBtn" class="text-[10px] text-red-500 uppercase font-bold tracking-wider">Xóa hết</button>
+                </div>
+                <div id="fileListItems" class="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-xs"></div>
+            </div>
+
+            <div id="resultCard" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-emerald-700 uppercase">Hoàn tất</h2>
+                    <button id="downloadAllBtn" class="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm">Tải về tất cả</button>
+                </div>
+                <div id="resultsTable" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- BMP Encoder (Pure JS) ---
+    // Đảm bảo file BMP 24-bit chuẩn để có preview trên mọi OS
+    function encodeBMP(canvas) {
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const { width, height, data } = imgData;
+        
+        const padding = (4 - (width * 3) % 4) % 4;
+        const fileSize = 54 + (width * 3 + padding) * height;
+        const buffer = new ArrayBuffer(fileSize);
+        const view = new DataView(buffer);
+
+        // File Header
+        view.setUint16(0, 0x4D42, true); // BM
+        view.setUint32(2, fileSize, true);
+        view.setUint32(10, 54, true); // Offset
+
+        // Info Header
+        view.setUint32(14, 40, true);
+        view.setInt32(18, width, true);
+        view.setInt32(22, height, true);
+        view.setUint16(26, 1, true);
+        view.setUint16(28, 24, true); // 24-bit
+        view.setUint32(34, (width * 3 + padding) * height, true);
+
+        // Pixel Data (Bottom-up)
+        let pos = 54;
+        for (let y = height - 1; y >= 0; y--) {
+            for (let x = 0; x < width; x++) {
+                const i = (y * width + x) * 4;
+                view.setUint8(pos++, data[i + 2]); // B
+                view.setUint8(pos++, data[i + 1]); // G
+                view.setUint8(pos++, data[i]);     // R
+            }
+            pos += padding;
+        }
+        return new Blob([buffer], { type: 'image/bmp' });
+    }
+
+    const { FFmpeg } = FFmpegWASM || {};
+    let ffmpeg = null;
+    let selectedFiles = [];
+    let processedResults = [];
+
+    // Elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileListCard = document.getElementById('fileListCard');
+    const fileListItems = document.getElementById('fileListItems');
+    const fileCount = document.getElementById('fileCount');
+    const clearBtn = document.getElementById('clearBtn');
+    const processBtn = document.getElementById('processBtn');
+    const btnText = document.getElementById('btnText');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const statusText = document.getElementById('statusText');
+    const progressBar = document.getElementById('progressBar');
+    const resizeMethod = document.getElementById('resizeMethod');
+    const dimensionType = document.getElementById('dimensionType');
+    const widthInput = document.getElementById('widthInput');
+    const heightInput = document.getElementById('heightInput');
+    const maintainAspectRatio = document.getElementById('maintainAspectRatio');
+    const fileNameInput = document.getElementById('fileNameInput');
+    const outputFormat = document.getElementById('outputFormat');
+    const resultCard = document.getElementById('resultCard');
+    const resultsTable = document.getElementById('resultsTable');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+    async function initFFmpeg() {
+        if (ffmpeg) return true;
+        if (!window.SharedArrayBuffer) {
+            console.warn("Môi trường không hỗ trợ FFmpeg WASM (thiếu SharedArrayBuffer). Sẽ dùng chế độ Canvas thuần.");
+            return false;
+        }
+        try {
+            ffmpeg = new FFmpeg();
+            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+            await ffmpeg.load({
+                coreURL: await FFmpegUtil.toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                wasmURL: await FFmpegUtil.toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+            });
+            return true;
+        } catch (e) {
+            console.error("FFmpeg load error:", e);
+            return false;
+        }
+    }
+
+    // Logic UI
+    dimensionType.addEventListener('change', (e) => {
+        const val = e.target.value;
+        widthInput.disabled = (val === 'height');
+        heightInput.disabled = (val === 'width');
+        document.getElementById('widthContainer').style.opacity = (val === 'height') ? '0.5' : '1';
+        document.getElementById('heightContainer').style.opacity = (val === 'width') ? '0.5' : '1';
+    });
+
+    resizeMethod.addEventListener('change', (e) => {
+        const isPixels = e.target.value === 'pixels';
+        document.getElementById('pixelControls').classList.toggle('hidden', !isPixels);
+        document.getElementById('percentageControls').classList.toggle('hidden', isPixels);
+    });
+
+    dropZone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFiles(e.target.files);
+    clearBtn.onclick = () => { selectedFiles = []; updateUI(); };
+
+    function handleFiles(files) {
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    selectedFiles.push({ file, w: img.width, h: img.height });
+                    updateUI();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function updateUI() {
+        fileCount.innerText = selectedFiles.length;
+        btnText.innerText = selectedFiles.length > 0 ? `Bắt đầu (${selectedFiles.length} ảnh)` : "Chưa có ảnh";
+        processBtn.disabled = selectedFiles.length === 0;
+        fileListCard.classList.toggle('hidden', selectedFiles.length === 0);
+        fileListItems.innerHTML = selectedFiles.map(f => `
+            <div class="flex justify-between p-1 border-b italic">
+                <span class="truncate max-w-[150px]">${f.file.name}</span>
+                <span>${f.w}x${f.h}px</span>
+            </div>
+        `).join('');
+        if (selectedFiles.length > 0 && !fileNameInput.value) {
+            fileNameInput.value = selectedFiles[0].file.name.split('.')[0];
+        }
+    }
+
+    processBtn.onclick = async () => {
+        loadingOverlay.classList.remove('hidden');
+        processedResults = [];
+        resultsTable.innerHTML = '';
+        resultCard.classList.add('hidden');
+
+        const isBmpMode = outputFormat.value === 'bmp';
+        const useFFmpeg = selectedFiles.some(f => f.file.type === 'image/gif') && await initFFmpeg();
+
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const item = selectedFiles[i];
+            progressBar.style.width = ((i / selectedFiles.length) * 100) + '%';
+            statusText.innerText = `Xử lý: ${item.file.name}`;
+
+            const dims = calculateTargetDims(item);
+            const ext = isBmpMode ? 'bmp' : item.file.name.split('.').pop().toLowerCase();
+            const baseName = fileNameInput.value.trim() || "image";
+            const finalName = i === 0 ? `${baseName}.${ext}` : `${baseName}_${i}.${ext}`;
+
+            try {
+                let blob;
+                if (item.file.type === 'image/gif' && useFFmpeg) {
+                    blob = await resizeGIF(item, dims.w, dims.h);
+                } else {
+                    blob = await resizeViaCanvas(item, dims.w, dims.h, isBmpMode);
+                }
+                processedResults.push({ blob, name: finalName });
+                addResult(blob, finalName);
+            } catch (err) { console.error(err); }
+        }
+
+        loadingOverlay.classList.add('hidden');
+        resultCard.classList.remove('hidden');
+    };
+
+    function calculateTargetDims(item) {
+        if (resizeMethod.value === 'percentage') {
+            const s = parseInt(document.getElementById('percentageInput').value) / 100;
+            return { w: Math.round(item.w * s), h: Math.round(item.h * s) };
+        }
+        const maintain = maintainAspectRatio.checked;
+        const type = dimensionType.value;
+        let tw = parseInt(widthInput.value), th = parseInt(heightInput.value);
+        if (type === 'width') return { w: tw, h: maintain ? Math.round((tw / item.w) * item.h) : item.h };
+        if (type === 'height') return { w: maintain ? Math.round((th / item.h) * item.w) : item.w, h: th };
+        return { w: tw, h: th };
+    }
+
+    async function resizeViaCanvas(item, w, h, toBmp) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingQuality = 'high';
+                ctx.fillStyle = "#FFFFFF"; // Nền trắng cho BMP/JPG
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                
+                if (toBmp) {
+                    resolve(encodeBMP(canvas)); // Dùng encoder thuần
+                } else {
+                    canvas.toBlob(b => resolve(b), item.file.type);
+                }
+            };
+            img.src = URL.createObjectURL(item.file);
+        });
+    }
+
+    async function resizeGIF(item, w, h) {
+        const inN = `i_${Date.now()}.gif`, outN = `o_${Date.now()}.gif`;
+        await ffmpeg.writeFile(inN, await FFmpegUtil.fetchFile(item.file));
+        await ffmpeg.exec(['-i', inN, '-vf', `scale=${w}:${h}`, outN]);
+        const data = await ffmpeg.readFile(outN);
+        return new Blob([data.buffer], { type: 'image/gif' });
+    }
+
+    function addResult(blob, name) {
+        const url = URL.createObjectURL(blob);
+        const div = document.createElement('div');
+        div.className = "flex items-center gap-3 bg-slate-50 p-2 rounded-lg border";
+        div.innerHTML = `
+            <img src="${url}" class="w-10 h-10 object-cover rounded">
+            <div class="flex-1 min-w-0">
+                <p class="text-[10px] font-bold truncate">${name}</p>
+                <p class="text-[8px] text-slate-400 uppercase">${(blob.size/1024).toFixed(1)} KB</p>
+            </div>
+            <a href="${url}" download="${name}" class="text-blue-600 font-bold text-xs">Tải</a>
+        `;
+        resultsTable.appendChild(div);
+    }
+
+    downloadAllBtn.onclick = () => {
+        processedResults.forEach((r, i) => setTimeout(() => {
+            const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; a.click();
+        }, i * 300));
+    };
+
+    document.getElementById('percentageSlider').oninput = (e) => document.getElementById('percentageInput').value = e.target.value;
+</script>
+</body>
+</html>
