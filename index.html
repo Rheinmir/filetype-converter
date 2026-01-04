@@ -13,6 +13,7 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #F5F5F7;
+            font-size: 13px; /* Standardize base size */
         }
 
         .mac-card {
@@ -54,7 +55,8 @@
             border: 1px solid #D1D1D6;
             border-radius: 6px;
             padding: 6px 10px;
-            font-size: 13px;
+            font-size: 13px; /* Standardize input size */
+            color: #1d1d1f;
         }
 
         input:focus, select:focus {
@@ -68,9 +70,10 @@
             border: 1px solid #005BB3;
             color: white;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            font-size: 13px;
         }
 
-        /* Traffic Lights - macOS Style */
+        /* Traffic Lights */
         .traffic-light {
             width: 12px;
             height: 12px;
@@ -111,6 +114,9 @@
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #C1C1C1; border-radius: 10px; }
+        
+        /* Swap Button Transition */
+        #swapDimensions:active { transform: scale(0.9) rotate(180deg); }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 md:p-8">
@@ -125,15 +131,15 @@
                 <div id="btn-min" class="traffic-light bg-[#FFBD2E] border border-[#DEA123]" title="Ẩn sidebar"></div>
                 <div id="btn-max" class="traffic-light bg-[#28C840] border border-[#1AAB29]" title="Toàn màn hình"></div>
             </div>
-            <h1 class="ml-2 font-bold text-slate-800 text-sm tracking-tight uppercase select-none">Resizer Pro</h1>
+            <h1 class="ml-2 font-bold text-slate-800 text-[13px] tracking-tight uppercase select-none">Resizer Pro</h1>
         </div>
 
         <div class="space-y-6">
             <section>
-                <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-3 tracking-wider">Cấu hình kích thước</label>
+                <label class="block text-[11px] font-bold text-slate-400 uppercase mb-3 tracking-wider">Cấu hình kích thước</label>
                 <div class="space-y-4">
                     <div>
-                        <span class="block text-xs font-medium text-slate-600 mb-1.5">Phương thức</span>
+                        <span class="block text-[13px] font-medium text-slate-600 mb-1.5">Phương thức</span>
                         <select id="resizeMethod" class="w-full">
                             <option value="pixels">Pixels (Điểm ảnh)</option>
                             <option value="percentage">Phần trăm (%)</option>
@@ -142,24 +148,32 @@
 
                     <div id="pixelControls" class="space-y-4">
                         <div>
-                            <span class="block text-xs font-medium text-slate-600 mb-1.5">Kích thước theo</span>
+                            <span class="block text-[13px] font-medium text-slate-600 mb-1.5">Kích thước theo</span>
                             <select id="dimensionType" class="w-full">
                                 <option value="width">Chiều rộng (Width)</option>
                                 <option value="height">Chiều cao (Height)</option>
                                 <option value="both" selected>Cả hai (Tùy chỉnh)</option>
                             </select>
                         </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div id="widthContainer">
-                                <span class="block text-[10px] font-medium text-slate-400 mb-1">Rộng (px)</span>
+                        
+                        <!-- Width & Height Inputs with Swap -->
+                        <div class="flex items-end gap-2">
+                            <div id="widthContainer" class="flex-1">
+                                <span class="block text-[11px] font-medium text-slate-400 mb-1">Rộng (px)</span>
                                 <input type="number" id="widthInput" value="1280" class="w-full">
                             </div>
-                            <div id="heightContainer">
-                                <span class="block text-[10px] font-medium text-slate-400 mb-1">Dài (px)</span>
+                            
+                            <button id="swapDimensions" class="mb-1 p-2 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm" title="Hoán đổi Rộng/Dài">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+                            </button>
+
+                            <div id="heightContainer" class="flex-1">
+                                <span class="block text-[11px] font-medium text-slate-400 mb-1">Dài (px)</span>
                                 <input type="number" id="heightInput" value="800" class="w-full">
                             </div>
                         </div>
-                        <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+
+                        <label class="flex items-center gap-2 text-[13px] text-slate-600 cursor-pointer">
                             <input type="checkbox" id="maintainAspectRatio" checked class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-0"> 
                             Giữ tỷ lệ ảnh
                         </label>
@@ -173,23 +187,23 @@
             </section>
 
             <section>
-                <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-3 tracking-wider">Định dạng & Tên</label>
+                <label class="block text-[11px] font-bold text-slate-400 uppercase mb-3 tracking-wider">Định dạng & Tên</label>
                 <div class="space-y-4">
                     <div>
-                        <span class="block text-xs font-medium text-slate-600 mb-1.5">Đổi tên file</span>
+                        <span class="block text-[13px] font-medium text-slate-600 mb-1.5">Đổi tên file</span>
                         <input type="text" id="fileNameInput" value="background" placeholder="Tên file mới..." class="w-full font-medium">
                     </div>
                     <div>
-                        <span class="block text-xs font-medium text-slate-600 mb-1.5">Định dạng đầu ra</span>
+                        <span class="block text-[13px] font-medium text-slate-600 mb-1.5">Định dạng đầu ra</span>
                         <select id="outputFormat" class="w-full">
                             <option value="original">Gốc (Giữ nguyên)</option>
-                            <option value="bmp" selected>BMP (Chuẩn 32-bit Top-Down)</option>
+                            <option value="bmp" selected>BMP (Chuẩn 32-bit ARGB)</option>
                         </select>
                     </div>
                 </div>
             </section>
 
-            <button id="processBtn" disabled class="w-full mac-button-primary py-2.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98] disabled:opacity-40 disabled:scale-100 mt-4">
+            <button id="processBtn" disabled class="w-full mac-button-primary py-2.5 rounded-lg font-medium transition-all active:scale-[0.98] disabled:opacity-40 disabled:scale-100 mt-4">
                 <span id="btnText">Chưa có ảnh</span>
             </button>
         </div>
@@ -203,10 +217,11 @@
 
         <header class="h-14 border-b border-slate-100 flex items-center justify-between px-6 flex-shrink-0">
             <h2 class="text-[13px] font-semibold text-slate-700">Trình quản lý tệp tin</h2>
-            <div id="fileCountHeader" class="text-[11px] text-slate-400 font-medium">0 tệp đã chọn</div>
+            <div id="fileCountHeader" class="text-[11px] text-slate-400 font-medium uppercase tracking-tight">0 tệp đã chọn</div>
         </header>
 
         <div class="flex-1 p-6 overflow-y-auto custom-scrollbar flex flex-col gap-6">
+            <!-- Dropzone -->
             <div id="dropZone" class="drop-zone rounded-xl flex flex-col items-center justify-center p-8 cursor-pointer relative flex-shrink-0 min-h-[160px]">
                 <input type="file" id="fileInput" class="hidden" multiple accept="image/*">
                 <div id="uploadPrompt" class="text-center group">
@@ -214,7 +229,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </div>
                     <p class="text-[13px] font-medium text-slate-600">Kéo thả ảnh vào đây để bắt đầu</p>
-                    <p class="text-[11px] text-slate-400 mt-1">Hỗ trợ JPG, PNG, GIF, SVG</p>
+                    <p class="text-[11px] text-slate-400 mt-1 uppercase tracking-wide">JPG, PNG, GIF, SVG</p>
                 </div>
 
                 <div id="loadingOverlay" class="hidden absolute inset-0 bg-white/95 backdrop-blur-md flex flex-col items-center justify-center z-20 p-8 rounded-xl">
@@ -226,18 +241,20 @@
                 </div>
             </div>
 
+            <!-- Pending List -->
             <div id="fileListCard" class="hidden animate-in fade-in slide-in-from-bottom-2">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hàng chờ</h3>
-                    <button id="clearBtn" class="text-[10px] text-red-500 font-bold uppercase hover:opacity-70">Xóa hết</button>
+                    <button id="clearBtn" class="text-[11px] text-red-500 font-bold uppercase hover:opacity-70">Xóa hết</button>
                 </div>
-                <div id="fileListItems" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-[12px]"></div>
+                <div id="fileListItems" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2"></div>
             </div>
 
+            <!-- Results -->
             <div id="resultCard" class="hidden animate-in fade-in slide-in-from-bottom-4">
                 <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-50">
-                    <h2 class="text-sm font-bold text-slate-800 uppercase">Kết quả</h2>
-                    <button id="downloadAllBtn" class="mac-button-primary text-[11px] font-bold px-4 py-1.5 rounded-md active:scale-95 shadow-sm uppercase">Tải về tất cả</button>
+                    <h2 class="text-[13px] font-bold text-slate-800 uppercase">Kết quả xử lý</h2>
+                    <button id="downloadAllBtn" class="mac-button-primary font-bold px-4 py-1.5 rounded-md active:scale-95 shadow-sm uppercase">Tải về tất cả</button>
                 </div>
                 <div id="resultsTable" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
             </div>
@@ -277,51 +294,53 @@
         }
     };
 
+    // --- Swap Dimensions ---
+    const swapBtn = document.getElementById('swapDimensions');
+    swapBtn.onclick = () => {
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
+        const temp = widthInput.value;
+        widthInput.value = heightInput.value;
+        heightInput.value = temp;
+    };
+
     /**
-     * BMP Encoder - Cập nhật cho Bootloader (Chuẩn 32-bit ARGB Top-Down)
-     * Các bootloader thường đọc dữ liệu từ trên xuống dưới trực tiếp vào framebuffer.
+     * BMP Encoder - Tương thích Bootloader (Chuẩn 32-bit ARGB Bottom-Up)
      */
     function encodeBMP(canvas) {
         const ctx = canvas.getContext('2d');
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const { width, height, data } = imgData;
         
-        // BMP 32-bit (4 bytes mỗi pixel) không cần padding.
         const fileSize = 54 + (width * height * 4);
         const buffer = new ArrayBuffer(fileSize);
         const view = new DataView(buffer);
 
-        // --- File Header (14 bytes) ---
-        view.setUint16(0, 0x4D42, true); // Chữ ký "BM"
-        view.setUint32(2, fileSize, true); // Kích thước tệp
-        view.setUint32(6, 0, true);       // Reserved
-        view.setUint32(10, 54, true);      // Vị trí bắt đầu dữ liệu pixel
+        view.setUint16(0, 0x4D42, true); 
+        view.setUint32(2, fileSize, true); 
+        view.setUint32(6, 0, true);       
+        view.setUint32(10, 54, true);      
 
-        // --- Info Header (40 bytes - BITMAPINFOHEADER) ---
-        view.setUint32(14, 40, true);      // Header size
-        view.setInt32(18, width, true);     // Chiều rộng
-        // Dùng giá trị âm cho height để chỉ định lưu trữ Top-Down (từ trên xuống)
-        view.setInt32(22, -height, true);    
-        view.setUint16(26, 1, true);       // Planes
-        view.setUint16(28, 32, true);      // Bits per pixel (32-bit)
-        view.setUint32(30, 0, true);       // Compression (BI_RGB - không nén)
-        view.setUint32(34, width * height * 4, true); // Image size
-        view.setInt32(38, 2835, true);     // Pixels per meter (72 DPI)
+        view.setUint32(14, 40, true);      
+        view.setInt32(18, width, true);     
+        view.setInt32(22, height, true);    
+        view.setUint16(26, 1, true);       
+        view.setUint16(28, 32, true);      
+        view.setUint32(30, 0, true);       
+        view.setUint32(34, width * height * 4, true); 
+        view.setInt32(38, 2835, true);     
         view.setInt32(42, 2835, true);
-        view.setUint32(46, 0, true);       // Colors used
-        view.setUint32(50, 0, true);       // Important colors
+        view.setUint32(46, 0, true);       
+        view.setUint32(50, 0, true);       
 
-        // --- Pixel Data (BGRA) ---
         let pos = 54;
-        // Vì đã đặt height âm trong header, chúng ta ghi dữ liệu từ trên xuống dưới (y=0 tới height-1)
-        for (let y = 0; y < height; y++) {
+        for (let y = height - 1; y >= 0; y--) {
             for (let x = 0; x < width; x++) {
                 const i = (y * width + x) * 4;
-                // Chuẩn BMP lưu theo thứ tự Blue, Green, Red, Alpha
                 view.setUint8(pos++, data[i + 2]); // B
                 view.setUint8(pos++, data[i + 1]); // G
                 view.setUint8(pos++, data[i]);     // R
-                view.setUint8(pos++, data[i + 3]); // A
+                view.setUint8(pos++, 0xFF);        // Alpha Opaque
             }
         }
         return new Blob([buffer], { type: 'image/bmp' });
@@ -348,6 +367,8 @@
 
     dimensionType.onchange = (e) => {
         const val = e.target.value;
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
         widthInput.disabled = (val === 'height');
         heightInput.disabled = (val === 'width');
         document.getElementById('widthContainer').style.opacity = (val === 'height') ? '0.4' : '1';
@@ -397,8 +418,8 @@
         
         fileListItems.innerHTML = selectedFiles.map((f) => `
             <div class="flex flex-col p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                <span class="truncate font-semibold text-slate-700 mb-1">${f.file.name}</span>
-                <span class="text-[10px] text-slate-400 font-mono">${f.w}x${f.h}px</span>
+                <span class="truncate font-semibold text-slate-700 mb-1 text-[13px]">${f.file.name}</span>
+                <span class="text-[11px] text-slate-400 font-mono">${f.w}x${f.h}px</span>
             </div>
         `).join('');
     }
@@ -443,6 +464,8 @@
         }
         const maintain = maintainAspectRatio.checked;
         const type = dimensionType.value;
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
         let tw = parseInt(widthInput.value), th = parseInt(heightInput.value);
         if (type === 'width') return { w: tw, h: maintain ? Math.round((tw / item.w) * item.h) : item.h };
         if (type === 'height') return { w: maintain ? Math.round((th / item.h) * item.w) : item.w, h: th };
@@ -485,10 +508,10 @@
             </div>
             <div class="flex items-center justify-between gap-2">
                 <div class="flex-1 min-w-0">
-                    <p class="text-[11px] font-bold text-slate-800 truncate">${name}</p>
-                    <p class="text-[9px] text-slate-400 font-medium">${(blob.size/1024).toFixed(1)} KB</p>
+                    <p class="text-[13px] font-bold text-slate-800 truncate">${name}</p>
+                    <p class="text-[11px] text-slate-400 font-medium uppercase tracking-tight">${(blob.size/1024).toFixed(1)} KB</p>
                 </div>
-                <a href="${url}" download="${name}" class="text-blue-600 font-bold text-[11px] hover:underline flex-shrink-0">Tải về</a>
+                <a href="${url}" download="${name}" class="text-blue-600 font-bold text-[13px] hover:underline flex-shrink-0">Tải về</a>
             </div>
         `;
         resultsTable.appendChild(div);
